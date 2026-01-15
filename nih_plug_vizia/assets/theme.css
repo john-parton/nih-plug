@@ -3,7 +3,7 @@
 :root {
   background-color: #fafafa;
   color: #0a0a0a;
-  font-size: 15;
+  font-size: 15px;
   /*
    * NOTE: vizia's font rendering looks way too dark and thick. Going one font
    *       weight lower seems to compensate for this.
@@ -11,29 +11,36 @@
   font-weight: light;
 }
 
-scrollview > scroll_content {
+scrollview>scroll_content {
   /* Normally the scroll bar overlaps with the content, so we'll add a little offset to prevent that */
-  child-right: 15px;
+  padding-right: 15px;
+  /* Make content fill the scrollview width */
+  width: 100%;
 }
+
 scrollview scrollbar {
   background-color: #dadada;
-  border-radius: 0px;
-  child-space: 0px;
+  corner-radius: 0px;
+  gap: 0px;
 }
+
 scrollview scrollbar.horizontal {
   right: 10px;
   height: 10px;
 }
+
 scrollview scrollbar.vertical {
   width: 10px;
 }
+
 scrollview scrollbar .thumb {
   background-color: #5d5d5d;
-  border-radius: 0px;
+  corner-radius: 0px;
   min-width: 10px;
   min-height: 10px;
   transition: background-color 100ms;
 }
+
 scrollview scrollbar .thumb:hover {
   background-color: #808080;
   transition: background-color 100ms;

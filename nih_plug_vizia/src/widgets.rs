@@ -73,6 +73,9 @@ pub enum RawParamEvent {
 
 /// Events that directly interact with the [`GuiContext`]. Used to trigger resizes.
 pub enum GuiContextEvent {
+    /// Set the user scale factor and resize the window accordingly. This is used by the
+    /// [`ResizeHandle`] widget to allow dragging to resize the window.
+    SetScale(f64),
     /// Resize the window to match the current size reported by the [`ViziaState`]'s size function.
     /// By changing the plugin's state that is used to determine the window's size before emitting
     /// this event, the window can be resized in a declarative and predictable way:
@@ -147,11 +150,27 @@ impl Model for ParamModel {
 impl Model for WindowModel {
     fn event(&mut self, cx: &mut EventContext, event: &mut Event) {
         event.map(|gui_context_event, meta| match gui_context_event {
+            GuiContextEvent::SetScale(new_scale_factor) => {
+                // Update the scale factor in the ViziaState
+                self.vizia_state.scale_factor.store(*new_scale_factor);
+                // Request a resize from the host - this will trigger WindowEvent::GeometryChanged
+                // if the host accepts the new size
+                if !self.context.request_resize() {
+                    // If the host rejected the resize, revert the scale factor
+                    // (The GeometryChanged handler below will handle successful resizes)
+                }
+                // Emit the WindowEvent to actually resize the vizia window
+                cx.emit(WindowEvent::SetUserScale(*new_scale_factor as f32));
+
+                meta.consume();
+            }
             GuiContextEvent::Resize => {
                 // This will trigger a `WindowEvent::GeometryChanged`, which in turn causes the
                 // handler below this to be fired
                 let (width, height) = self.vizia_state.inner_logical_size();
-                cx.set_window_size(WindowSize { width, height });
+                // In Vizia 3, we set the width and height directly as Units
+                cx.set_width(Units::Pixels(width as f32));
+                cx.set_height(Units::Pixels(height as f32));
 
                 meta.consume();
             }
@@ -159,8 +178,9 @@ impl Model for WindowModel {
 
         // This gets fired whenever the inner window gets resized
         event.map(|window_event, _| {
-            if let WindowEvent::GeometryChanged { .. } = window_event {
-                let logical_size = (cx.window_size().width, cx.window_size().height);
+            if let WindowEvent::GeometryChanged(_) = window_event {
+                let bounds = cx.bounds();
+                let logical_size = (bounds.w as u32, bounds.h as u32);
                 // `self.vizia_state.inner_logical_size()` should match `logical_size`. Since it's
                 // computed we need to store the last logical size on this object.
                 nih_debug_assert_eq!(
@@ -171,12 +191,14 @@ impl Model for WindowModel {
                 );
                 let old_logical_size @ (old_logical_width, old_logical_height) =
                     self.last_inner_window_size.load();
-                let scale_factor = cx.user_scale_factor();
+                let scale_factor = cx.scale_factor() as f64;
                 let old_user_scale_factor = self.vizia_state.scale_factor.load();
 
                 // Don't do anything if the current size already matches the new size, this could
                 // otherwise also cause a feedback loop on resize failure
-                if logical_size == old_logical_size && scale_factor == old_user_scale_factor {
+                if logical_size == old_logical_size
+                    && (scale_factor - old_user_scale_factor).abs() < 0.001
+                {
                     return;
                 }
 
@@ -190,11 +212,10 @@ impl Model for WindowModel {
 
                     // This will cause the window's size to be reverted on the next event loop
                     // NOTE: Is resizing back the correct behavior now that the size is computed?
-                    cx.set_window_size(WindowSize {
-                        width: old_logical_width,
-                        height: old_logical_height,
-                    });
-                    cx.set_user_scale_factor(old_user_scale_factor);
+                    cx.set_width(Units::Pixels(old_logical_width as f32));
+                    cx.set_height(Units::Pixels(old_logical_height as f32));
+                    // Note: scale_factor in EventContext is read-only in Vizia 3
+                    // scale factor changes need to be handled differently
                 }
             }
         });

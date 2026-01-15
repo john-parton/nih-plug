@@ -31,7 +31,7 @@ impl ParamButton {
         cx: &mut Context,
         params: L,
         params_to_param: FMap,
-    ) -> Handle<Self>
+    ) -> Handle<'_, Self>
     where
         L: Lens<Target = Params> + Clone,
         Params: 'static,
@@ -54,6 +54,8 @@ impl ParamButton {
                         Some(label_override) => Label::new(cx, &label_override),
                         None => Label::new(cx, param_data.param().name()),
                     }
+                    .width(Stretch(1.0))
+                    .text_align(TextAlign::Center)
                     .hoverable(false);
                 })
             }),

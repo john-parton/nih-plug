@@ -48,28 +48,28 @@ pub(crate) fn create(
         .build(cx);
 
         VStack::new(cx, |cx| {
-            Label::new(cx, "Crisp")
-                .font_family(vec![FamilyOwned::Name(String::from(assets::NOTO_SANS))])
-                .font_weight(FontWeightKeyword::Thin)
-                .font_size(30.0)
-                .height(Pixels(50.0))
-                .child_top(Stretch(1.0))
-                .child_bottom(Pixels(1.0))
-                // Make this more or less align with the parameters column
-                .right(Pixels(67.0));
+            // Wrapper HStack to center the title horizontally
+            HStack::new(cx, |cx| {
+                Element::new(cx).width(Stretch(1.0));
+                Label::new(cx, "Crisp")
+                    .font_family(vec![FamilyOwned::Named(String::from(assets::NOTO_SANS))])
+                    .font_weight(FontWeightKeyword::Thin)
+                    .font_size(30.0);
+                Element::new(cx).width(Stretch(1.0));
+            })
+            .height(Pixels(50.0))
+            .width(Percentage(100.0));
 
-            ScrollView::new(cx, 0.0, 0.0, false, true, |cx| {
+            ScrollView::new(cx, |cx| {
                 // This looks better if it's flush at the top, and then we'll just add some padding
                 // at the top of the scroll view
-                GenericUi::new(cx, Data::params).child_top(Pixels(0.0));
+                GenericUi::new(cx, Data::params);
             })
             .width(Percentage(100.0))
             .top(Pixels(5.0));
         })
-        .row_between(Pixels(0.0))
-        .child_left(Stretch(1.0))
-        .child_right(Stretch(1.0));
+        .width(Percentage(100.0));
 
-        ResizeHandle::new(cx);
+        nih_plug_vizia::widgets::ResizeHandle::new(cx);
     })
 }

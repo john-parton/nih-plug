@@ -20,6 +20,7 @@ use nih_plug_vizia::vizia::prelude::*;
 use nih_plug_vizia::vizia::vg;
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 use crate::analyzer::AnalyzerData;
 use crate::curve::Curve;
@@ -33,6 +34,23 @@ const LN_FREQ_RANGE_START_HZ: f32 = 3.4011974; // 30.0f32.ln();
 const LN_FREQ_RANGE_END_HZ: f32 = 9.998797; // 22_000.0f32.ln();
 const LN_FREQ_RANGE: f32 = LN_FREQ_RANGE_END_HZ - LN_FREQ_RANGE_START_HZ;
 
+const REPAINT_INTERVAL: Duration = Duration::from_millis(30);
+
+/// Event to trigger a repaint of the analyzer.
+pub enum AnalyzerEvent {
+    Repaint,
+}
+
+/// Helper function to create a color from RGBA floats (0.0-1.0)
+fn color_from_rgbaf(r: f32, g: f32, b: f32, a: f32) -> vg::Color {
+    vg::Color::from_argb(
+        (a * 255.0) as u8,
+        (r * 255.0) as u8,
+        (g * 255.0) as u8,
+        (b * 255.0) as u8,
+    )
+}
+
 /// The color used for drawing the overlay. Currently not configurable using the style sheet (that
 /// would be possible by moving this to a dedicated view and overlaying that).
 ///
@@ -40,14 +58,21 @@ const LN_FREQ_RANGE: f32 = LN_FREQ_RANGE_END_HZ - LN_FREQ_RANGE_START_HZ;
 ///
 /// This is drawn using some blending options that make it interact differently with darker
 /// backgrounds.
-const GR_BAR_OVERLAY_COLOR: vg::Color = vg::Color::rgbaf(0.85, 0.95, 1.0, 0.8);
+fn gr_bar_overlay_color() -> vg::Color {
+    color_from_rgbaf(0.85, 0.95, 1.0, 0.8)
+}
 
 /// The color used for drawing the downwards compression threshold curve. Looks somewhat similar to
 /// `GR_BAR_OVERLAY_COLOR` when factoring in the blending.
-const DOWNWARDS_THRESHOLD_CURVE_COLOR: vg::Color = vg::Color::rgbaf(0.45, 0.55, 0.6, 0.9);
+fn downwards_threshold_curve_color() -> vg::Color {
+    color_from_rgbaf(0.45, 0.55, 0.6, 0.9)
+}
+
 /// The color used for drawing the upwards compression threshold curve. Slightly color to make to
 /// make the output look less confusing.
-const UPWARDS_THRESHOLD_CURVE_COLOR: vg::Color = vg::Color::rgbaf(0.55, 0.70, 0.65, 0.9);
+fn upwards_threshold_curve_color() -> vg::Color {
+    color_from_rgbaf(0.55, 0.70, 0.65, 0.9)
+}
 
 /// A very analyzer showing the envelope followers as a magnitude spectrum with an overlay for the
 /// gain reduction.
@@ -62,7 +87,7 @@ impl Analyzer {
         cx: &mut Context,
         analyzer_data: LAnalyzerData,
         sample_rate: LRate,
-    ) -> Handle<Self>
+    ) -> Handle<'_, Self>
     where
         LAnalyzerData: Lens<Target = Arc<Mutex<triple_buffer::Output<AnalyzerData>>>>,
         LRate: Lens<Target = Arc<AtomicF32>>,
@@ -76,6 +101,16 @@ impl Analyzer {
             // This is an otherwise empty element only used for custom drawing
             |_cx| (),
         )
+        .on_build(|cx| {
+            // Spawn a background thread that periodically sends repaint events
+            cx.spawn(move |proxy| loop {
+                std::thread::sleep(REPAINT_INTERVAL);
+                if proxy.emit(AnalyzerEvent::Repaint).is_err() {
+                    // The window was closed, stop the thread
+                    break;
+                }
+            });
+        })
     }
 }
 
@@ -84,7 +119,15 @@ impl View for Analyzer {
         Some("analyzer")
     }
 
-    fn draw(&self, cx: &mut DrawContext, canvas: &mut Canvas) {
+    fn event(&mut self, cx: &mut EventContext, event: &mut Event) {
+        event.map(|app_event, _| match app_event {
+            AnalyzerEvent::Repaint => {
+                cx.needs_redraw();
+            }
+        });
+    }
+
+    fn draw(&self, cx: &mut DrawContext, canvas: &Canvas) {
         let bounds = cx.bounds();
         if bounds.w == 0.0 || bounds.h == 0.0 {
             return;
@@ -110,15 +153,18 @@ impl View for Analyzer {
             let y = bounds.y + border_width / 2.0;
             let w = bounds.w - border_width;
             let h = bounds.h - border_width;
-            path.move_to(x, y);
-            path.line_to(x, y + h);
-            path.line_to(x + w, y + h);
-            path.line_to(x + w, y);
+            path.move_to((x, y));
+            path.line_to((x, y + h));
+            path.line_to((x + w, y + h));
+            path.line_to((x + w, y));
             path.close();
         }
 
-        let paint = vg::Paint::color(border_color).with_line_width(border_width);
-        canvas.stroke_path(&path, &paint);
+        let mut paint = vg::Paint::default();
+        paint.set_color(border_color);
+        paint.set_style(vg::paint::Style::Stroke);
+        paint.set_stroke_width(border_width);
+        canvas.draw_path(&path, &paint);
     }
 }
 
@@ -134,7 +180,7 @@ fn db_to_unclamped_t(db_value: f32) -> f32 {
 /// instead.
 fn draw_spectrum(
     cx: &mut DrawContext,
-    canvas: &mut Canvas,
+    canvas: &Canvas,
     analyzer_data: &AnalyzerData,
     nyquist_hz: f32,
 ) {
@@ -142,14 +188,22 @@ fn draw_spectrum(
 
     let line_width = cx.scale_factor() * 1.5;
     let text_color: vg::Color = cx.font_color().into();
+
     // This is used to draw the individual bars
-    let bars_paint = vg::Paint::color(text_color).with_line_width(line_width);
+    let mut bars_paint = vg::Paint::default();
+    bars_paint.set_color(text_color);
+    bars_paint.set_style(vg::paint::Style::Stroke);
+    bars_paint.set_stroke_width(line_width);
+
     // And this color is used to draw the mesh part of the spectrum. We'll create a gradient paint
     // that fades from this to `text_color` when we know the mesh's x-coordinates.
-    let mut lighter_text_color = text_color;
-    lighter_text_color.r = (lighter_text_color.r + 0.25) / 1.25;
-    lighter_text_color.g = (lighter_text_color.g + 0.25) / 1.25;
-    lighter_text_color.b = (lighter_text_color.b + 0.25) / 1.25;
+    let lighter_text_color = {
+        let r = ((text_color.r() as f32 / 255.0) + 0.25) / 1.25;
+        let g = ((text_color.g() as f32 / 255.0) + 0.25) / 1.25;
+        let b = ((text_color.b() as f32 / 255.0) + 0.25) / 1.25;
+        let a = text_color.a() as f32 / 255.0;
+        color_from_rgbaf(r, g, b, a)
+    };
 
     // The frequency belonging to a bin in Hz
     let bin_frequency = |bin_idx: f32| (bin_idx / analyzer_data.num_bins as f32) * nyquist_hz;
@@ -197,12 +251,12 @@ fn draw_spectrum(
         // Diopser's spectrum analyzer.
         let height = magnitude_height(*magnitude);
 
-        bars_path.move_to(physical_x_coord, bounds.y + (bounds.h * (1.0 - height)));
-        bars_path.line_to(physical_x_coord, bounds.y + bounds.h);
+        bars_path.move_to((physical_x_coord, bounds.y + (bounds.h * (1.0 - height))));
+        bars_path.line_to((physical_x_coord, bounds.y + bounds.h));
 
         previous_physical_x_coord = physical_x_coord;
     }
-    canvas.stroke_path(&bars_path, &bars_paint);
+    canvas.draw_path(&bars_path, &bars_paint);
 
     // The mesh path starts at the bottom left, follows the top envelope of the spectrum analyzer,
     // and ends in the bottom right
@@ -210,7 +264,7 @@ fn draw_spectrum(
     let mesh_start_x_coordiante = bounds.x + (bounds.w * bin_t(mesh_bin_start_idx as f32));
     let mesh_start_y_coordinate = bounds.y + bounds.h;
 
-    mesh_path.move_to(mesh_start_x_coordiante, mesh_start_y_coordinate);
+    mesh_path.move_to((mesh_start_x_coordiante, mesh_start_y_coordinate));
     for (bin_idx, magnitude) in analyzer_data
         .envelope_followers
         .iter()
@@ -227,44 +281,58 @@ fn draw_spectrum(
         previous_physical_x_coord = physical_x_coord;
         let height = magnitude_height(*magnitude);
         if height > 0.0 {
-            mesh_path.line_to(
+            mesh_path.line_to((
                 physical_x_coord,
                 // This includes the line width, since this path is not stroked
                 bounds.y + (bounds.h * (1.0 - height) - (line_width / 2.0)).max(0.0),
-            );
+            ));
         } else {
-            mesh_path.line_to(physical_x_coord, mesh_start_y_coordinate);
+            mesh_path.line_to((physical_x_coord, mesh_start_y_coordinate));
         }
     }
 
-    mesh_path.line_to(previous_physical_x_coord, mesh_start_y_coordinate);
+    mesh_path.line_to((previous_physical_x_coord, mesh_start_y_coordinate));
     mesh_path.close();
 
-    let mesh_paint = vg::Paint::linear_gradient_stops(
-        mesh_start_x_coordiante,
-        0.0,
-        previous_physical_x_coord,
-        0.0,
-        [
-            (0.0, lighter_text_color),
-            (0.707, text_color),
-            (1.0, text_color),
-        ],
-    )
-    // NOTE:  This is very important, otherwise this looks all kinds of gnarly
-    .with_anti_alias(false);
-    canvas.fill_path(&mesh_path, &mesh_paint);
+    // Create gradient shader
+    let colors = [lighter_text_color, text_color, text_color];
+    let positions = [0.0, 0.707, 1.0];
+    let gradient = vg::gradient_shader::linear(
+        (
+            (mesh_start_x_coordiante, 0.0),
+            (previous_physical_x_coord, 0.0),
+        ),
+        colors.as_ref(),
+        Some(positions.as_ref()),
+        vg::TileMode::Clamp,
+        None,
+        None,
+    );
+
+    let mut mesh_paint = vg::Paint::default();
+    if let Some(shader) = gradient {
+        mesh_paint.set_shader(shader);
+    }
+    mesh_paint.set_anti_alias(false);
+    canvas.draw_path(&mesh_path, &mesh_paint);
 }
 
 /// Overlays the threshold curve over the spectrum analyzer. If either the upwards or downwards
 /// threshold offsets are non-zero then two curves are drawn.
-fn draw_threshold_curve(cx: &mut DrawContext, canvas: &mut Canvas, analyzer_data: &AnalyzerData) {
+fn draw_threshold_curve(cx: &mut DrawContext, canvas: &Canvas, analyzer_data: &AnalyzerData) {
     let bounds = cx.bounds();
 
     let line_width = cx.scale_factor() * 3.0;
-    let downwards_paint =
-        vg::Paint::color(DOWNWARDS_THRESHOLD_CURVE_COLOR).with_line_width(line_width);
-    let upwards_paint = vg::Paint::color(UPWARDS_THRESHOLD_CURVE_COLOR).with_line_width(line_width);
+
+    let mut downwards_paint = vg::Paint::default();
+    downwards_paint.set_color(downwards_threshold_curve_color());
+    downwards_paint.set_style(vg::paint::Style::Stroke);
+    downwards_paint.set_stroke_width(line_width);
+
+    let mut upwards_paint = vg::Paint::default();
+    upwards_paint.set_color(upwards_threshold_curve_color());
+    upwards_paint.set_style(vg::paint::Style::Stroke);
+    upwards_paint.set_stroke_width(line_width);
 
     // This can be done slightly cleverer but for our purposes drawing line segments that are either
     // 1 pixel apart or that split the curve up into 100 segments (whichever results in the least
@@ -272,7 +340,7 @@ fn draw_threshold_curve(cx: &mut DrawContext, canvas: &mut Canvas, analyzer_data
     let curve = Curve::new(&analyzer_data.curve_params);
     let num_points = 100.min(bounds.w.ceil() as usize);
 
-    let mut draw_with_offset = |offset_db: f32, paint: vg::Paint| {
+    let draw_with_offset = |offset_db: f32, paint: vg::Paint| {
         let mut path = vg::Path::new();
         for i in 0..num_points {
             let x_t = i as f32 / (num_points - 1) as f32;
@@ -288,17 +356,22 @@ fn draw_threshold_curve(cx: &mut DrawContext, canvas: &mut Canvas, analyzer_data
             let physical_y_pos = bounds.y + (bounds.h * (1.0 - y_t));
 
             if i == 0 {
-                path.move_to(physical_x_pos, physical_y_pos);
+                path.move_to((physical_x_pos, physical_y_pos));
             } else {
-                path.line_to(physical_x_pos, physical_y_pos);
+                path.line_to((physical_x_pos, physical_y_pos));
             }
         }
 
-        // This does a way better job at cutting off the tops and bottoms of the graph than we could do
-        // by hand
-        canvas.scissor(bounds.x, bounds.y, bounds.w, bounds.h);
-        canvas.stroke_path(&path, &paint);
-        canvas.reset_scissor();
+        // Use clip_path instead of scissor for clipping
+        canvas.save();
+        let mut clip_path = vg::Path::new();
+        clip_path.add_rect(
+            vg::Rect::from_xywh(bounds.x, bounds.y, bounds.w, bounds.h),
+            None,
+        );
+        canvas.clip_path(&clip_path, None, None);
+        canvas.draw_path(&path, &paint);
+        canvas.restore();
     };
 
     let (upwards_offset_db, downwards_offset_db) = analyzer_data.curve_offsets_db;
@@ -309,14 +382,16 @@ fn draw_threshold_curve(cx: &mut DrawContext, canvas: &mut Canvas, analyzer_data
 /// Overlays the gain reduction display over the spectrum analyzer.
 fn draw_gain_reduction(
     cx: &mut DrawContext,
-    canvas: &mut Canvas,
+    canvas: &Canvas,
     analyzer_data: &AnalyzerData,
     nyquist_hz: f32,
 ) {
     let bounds = cx.bounds();
 
     // As with the above, anti aliasing only causes issues
-    let paint = vg::Paint::color(GR_BAR_OVERLAY_COLOR).with_anti_alias(false);
+    let mut paint = vg::Paint::default();
+    paint.set_color(gr_bar_overlay_color());
+    paint.set_anti_alias(false);
 
     let bin_frequency = |bin_idx: f32| (bin_idx / analyzer_data.num_bins as f32) * nyquist_hz;
 
@@ -361,15 +436,15 @@ fn draw_gain_reduction(
         // NOTE: Y-coordinates go from top to bottom, hence the minus
         let t_y = ((-gain_difference_db + 40.0) / 80.0).clamp(0.0, 1.0);
 
-        path.move_to(bounds.x + (bounds.w * t_start), bounds.y + (bounds.h * 0.5));
-        path.line_to(bounds.x + (bounds.w * t_end), bounds.y + (bounds.h * 0.5));
-        path.line_to(bounds.x + (bounds.w * t_end), bounds.y + (bounds.h * t_y));
-        path.line_to(bounds.x + (bounds.w * t_start), bounds.y + (bounds.h * t_y));
+        path.move_to((bounds.x + (bounds.w * t_start), bounds.y + (bounds.h * 0.5)));
+        path.line_to((bounds.x + (bounds.w * t_end), bounds.y + (bounds.h * 0.5)));
+        path.line_to((bounds.x + (bounds.w * t_end), bounds.y + (bounds.h * t_y)));
+        path.line_to((bounds.x + (bounds.w * t_start), bounds.y + (bounds.h * t_y)));
         path.close();
     }
 
-    canvas
-        .global_composite_blend_func(vg::BlendFactor::DstAlpha, vg::BlendFactor::OneMinusDstColor);
-    canvas.fill_path(&path, &paint);
-    canvas.global_composite_blend_func(vg::BlendFactor::One, vg::BlendFactor::OneMinusSrcAlpha);
+    // Set blend mode for the gain reduction overlay
+    // In skia-safe, blend modes are set on the paint
+    paint.set_blend_mode(vg::BlendMode::Modulate);
+    canvas.draw_path(&path, &paint);
 }

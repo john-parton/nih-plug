@@ -28,6 +28,9 @@ use self::mode_button::EditorModeButton;
 use crate::analyzer::AnalyzerData;
 use crate::{SpectralCompressor, SpectralCompressorParams};
 
+// Disambiguate ResizeHandle
+use nih_plug_vizia::widgets::ResizeHandle as NihResizeHandle;
+
 mod analyzer;
 mod mode_button;
 
@@ -101,7 +104,7 @@ pub(crate) fn create(editor_state: Arc<ViziaState>, editor_data: Data) -> Option
             });
         });
 
-        ResizeHandle::new(cx);
+        NihResizeHandle::new(cx);
     })
 }
 
@@ -115,7 +118,7 @@ fn main_column(cx: &mut Context) {
 
             HStack::new(cx, |cx| {
                 Label::new(cx, "Spectral Compressor")
-                    .font_family(vec![FamilyOwned::Name(String::from(assets::NOTO_SANS))])
+                    .font_family(vec![FamilyOwned::Named(String::from(assets::NOTO_SANS))])
                     .font_weight(FontWeightKeyword::Thin)
                     .font_size(30.0)
                     .on_mouse_down(|_, _| {
@@ -149,7 +152,7 @@ fn main_column(cx: &mut Context) {
         .left(Pixels(10.0))
         .top(Pixels(10.0))
         // This contains the editor mode buttom all the way on the left, and the plugin's name all the way on the right
-        .col_between(Stretch(1.0));
+        .horizontal_gap(Stretch(1.0));
 
         HStack::new(cx, |cx| {
             make_column(cx, "Globals", |cx| {
@@ -217,9 +220,7 @@ fn main_column(cx: &mut Context) {
         .size(Auto);
     })
     .width(Pixels(COLLAPSED_GUI_WIDTH as f32))
-    .row_between(Pixels(10.0))
-    .child_left(Stretch(1.0))
-    .child_right(Stretch(1.0));
+    .vertical_gap(Pixels(10.0));
 }
 
 fn analyzer_column(cx: &mut Context) {
@@ -234,7 +235,7 @@ fn analyzer_column(cx: &mut Context) {
 fn make_column(cx: &mut Context, title: &str, contents: impl FnOnce(&mut Context)) {
     VStack::new(cx, |cx| {
         Label::new(cx, title)
-            .font_family(vec![FamilyOwned::Name(String::from(assets::NOTO_SANS))])
+            .font_family(vec![FamilyOwned::Named(String::from(assets::NOTO_SANS))])
             .font_weight(FontWeightKeyword::Thin)
             .font_size(23.0)
             .left(Stretch(1.0))

@@ -29,15 +29,17 @@ impl GenericUi {
         PsRef: AsRef<Ps> + 'static,
         Ps: Params + 'static,
     {
-        // Basic styling is done in the `theme.css` style sheet
+        // Layout controlled entirely in Rust, no CSS classes
         Self::new_custom(cx, params, move |cx, param_ptr| {
             HStack::new(cx, |cx| {
-                // Align this on the right
-                Label::new(cx, unsafe { param_ptr.name() }).class("label");
-
+                Label::new(cx, unsafe { param_ptr.name() })
+                    .width(Stretch(1.0))
+                    .height(Pixels(30.0))
+                    .text_align(TextAlign::Right);
                 Self::draw_widget(cx, params, param_ptr);
             })
-            .class("row");
+            .height(Pixels(30.0))
+            .horizontal_gap(Pixels(5.0));
         })
     }
 
@@ -47,7 +49,7 @@ impl GenericUi {
         cx: &mut Context,
         params: L,
         mut make_widget: impl FnMut(&mut Context, ParamPtr),
-    ) -> Handle<Self>
+    ) -> Handle<'_, Self>
     where
         L: Lens<Target = PsRef>,
         PsRef: AsRef<Ps> + 'static,
@@ -96,8 +98,7 @@ impl GenericUi {
             // This is already the default, but continuous parameters should be drawn from
             // the center if the default is also centered, or from the left if it is not
             None => ParamSliderStyle::Centered,
-        })
-        .class("widget");
+        });
     }
 }
 

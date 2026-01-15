@@ -109,7 +109,7 @@ impl XyPad {
         params_to_y_param: FMap2,
         x_renormalize_display: impl Fn(f32) -> f32 + Clone + 'static,
         x_renormalize_event: impl Fn(f32) -> f32 + 'static,
-    ) -> Handle<Self>
+    ) -> Handle<'_, Self>
     where
         L: Lens<Target = Params> + Clone,
         Params: 'static,
@@ -218,7 +218,6 @@ impl XyPad {
                 cx.emit(TextEvent::StartEdit);
                 cx.emit(TextEvent::SelectAll);
             })
-            .class("align_center")
             .space(Stretch(1.0));
     }
 
@@ -231,7 +230,7 @@ impl XyPad {
         y_display_value_lens: impl Lens<Target = String>,
     ) {
         XyPadHandle::new(cx)
-            .position_type(PositionType::SelfDirected)
+            .position_type(PositionType::Absolute)
             .top(y_position_lens)
             .left(x_position_lens)
             .hoverable(false);
@@ -251,7 +250,7 @@ impl XyPad {
         .class("xy-pad__tooltip")
         .left(XyPad::tooltip_pos_x)
         .top(XyPad::tooltip_pos_y)
-        .position_type(PositionType::SelfDirected)
+        .position_type(PositionType::Absolute)
         .on_geo_changed(|cx, change_flags| {
             // When a new parameter value causes the width of the tooltip to
             // change, we must recompute its position so it stays anchored to
@@ -272,7 +271,7 @@ impl XyPad {
     ) {
         XyPadHandle::new(cx)
             .class("xy-pad__handle--modulated")
-            .position_type(PositionType::SelfDirected)
+            .position_type(PositionType::Absolute)
             .top(modulated_y_position_lens)
             .left(modulated_x_position_lens)
             .hoverable(false);
@@ -341,8 +340,8 @@ impl XyPad {
     /// space there, the tooltip will be pushed to the left or the right of the cursor.
     fn update_tooltip_pos(&mut self, cx: &mut EventContext) {
         let bounds = cx.cache.get_bounds(cx.current());
-        let relative_x = cx.mouse().cursorx - bounds.x;
-        let relative_y = cx.mouse().cursory - bounds.y;
+        let relative_x = cx.mouse().cursor_x - bounds.x;
+        let relative_y = cx.mouse().cursor_y - bounds.y;
 
         // These positions need to take DPI scaling into account
         let dpi_scale = cx.scale_factor();
@@ -378,7 +377,7 @@ impl XyPad {
 }
 
 impl XyPadHandle {
-    fn new(cx: &mut Context) -> Handle<Self> {
+    fn new(cx: &mut Context) -> Handle<'_, Self> {
         // This doesn't have or need any special behavior, it's just a marker element used for
         // positioning he handle
         Self.build(cx, |_| ())
@@ -452,16 +451,16 @@ impl View for XyPad {
                     self.begin_set_parameters(cx);
                     if cx.modifiers().shift() {
                         self.granular_drag_status = Some(GranularDragStatus {
-                            starting_x_coordinate: cx.mouse().cursorx,
+                            starting_x_coordinate: cx.mouse().cursor_x,
                             x_starting_value: self.x_param_base.unmodulated_normalized_value(),
-                            starting_y_coordinate: cx.mouse().cursory,
+                            starting_y_coordinate: cx.mouse().cursor_y,
                             y_starting_value: self.y_param_base.unmodulated_normalized_value(),
                         });
                     } else {
                         self.granular_drag_status = None;
                         self.set_normalized_values_for_mouse_pos(
                             cx,
-                            (cx.mouse().cursorx, cx.mouse().cursory),
+                            (cx.mouse().cursor_x, cx.mouse().cursor_y),
                             false,
                         );
                     }
@@ -567,7 +566,7 @@ impl View for XyPad {
                     self.granular_drag_status = None;
                     self.set_normalized_values_for_mouse_pos(
                         cx,
-                        (cx.mouse().cursorx, cx.mouse().cursory),
+                        (cx.mouse().cursor_x, cx.mouse().cursor_y),
                         cx.modifiers().alt(),
                     );
                 }

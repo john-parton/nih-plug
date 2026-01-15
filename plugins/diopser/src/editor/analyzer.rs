@@ -21,9 +21,17 @@ use nih_plug_vizia::vizia::prelude::*;
 use nih_plug_vizia::vizia::vg;
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 use crate::params;
 use crate::spectrum::SpectrumOutput;
+
+const REPAINT_INTERVAL: Duration = Duration::from_millis(30);
+
+/// Event to trigger a repaint of the spectrum analyzer.
+pub enum SpectrumAnalyzerEvent {
+    Repaint,
+}
 
 /// A very abstract spectrum analyzer. This draws the magnitude spectrum's bins as vertical lines
 /// with the same distribution as the filter frequency parameter..
@@ -49,7 +57,7 @@ impl SpectrumAnalyzer {
         spectrum: LSpectrum,
         sample_rate: LRate,
         x_renormalize_display: impl Fn(f32) -> f32 + Clone + 'static,
-    ) -> Handle<Self>
+    ) -> Handle<'_, Self>
     where
         LSpectrum: Lens<Target = Arc<Mutex<SpectrumOutput>>>,
         LRate: Lens<Target = Arc<AtomicF32>>,
@@ -66,6 +74,16 @@ impl SpectrumAnalyzer {
             // This is an otherwise empty element only used for custom drawing
             |_cx| (),
         )
+        .on_build(|cx| {
+            // Spawn a background thread that periodically sends repaint events
+            cx.spawn(move |proxy| loop {
+                std::thread::sleep(REPAINT_INTERVAL);
+                if proxy.emit(SpectrumAnalyzerEvent::Repaint).is_err() {
+                    // The window was closed, stop the thread
+                    break;
+                }
+            });
+        })
     }
 }
 
@@ -74,11 +92,23 @@ impl View for SpectrumAnalyzer {
         Some("spectrum-analyzer")
     }
 
-    fn draw(&self, cx: &mut DrawContext, canvas: &mut Canvas) {
+    fn event(&mut self, cx: &mut EventContext, event: &mut Event) {
+        event.map(|app_event, _| match app_event {
+            SpectrumAnalyzerEvent::Repaint => {
+                cx.needs_redraw();
+            }
+        });
+    }
+
+    fn draw(&self, cx: &mut DrawContext, canvas: &Canvas) {
         let bounds = cx.bounds();
         if bounds.w == 0.0 || bounds.h == 0.0 {
             return;
         }
+
+        // Draw background and borders first
+        cx.draw_background(canvas);
+        cx.draw_border(canvas);
 
         // This spectrum buffer is written to at the end of the process function when the editor is
         // open
@@ -86,17 +116,21 @@ impl View for SpectrumAnalyzer {
         let spectrum = spectrum.read();
         let nyquist = self.sample_rate.load(Ordering::Relaxed) / 2.0;
 
-        // This skips background and border drawing
-        // NOTE: We could do the same thing like in Spectral Compressor and draw part of this
-        //       spectrum analyzer as a single mesh but for whatever erason the aliasing/moire
-        //       pattern here doesn't look nearly as bad.
         let line_width = cx.scale_factor() * 1.5;
-        let paint = vg::Paint::color(cx.font_color().into()).with_line_width(line_width);
+        let text_color: vg::Color = cx.font_color().into();
+
+        // Create a paint with the stroke style and width
+        let mut paint = vg::Paint::default();
+        paint.set_color(text_color);
+        paint.set_style(vg::paint::Style::Stroke);
+        paint.set_stroke_width(line_width);
+
         let mut path = vg::Path::new();
+
         for (bin_idx, magnitude) in spectrum.iter().enumerate() {
             // We'll match up the bin's x-coordinate with the filter frequency parameter
             let frequency = (bin_idx as f32 / spectrum.len() as f32) * nyquist;
-            // NOTE: This takes the safe-mode switch into acocunt. When it is enabled, the range is
+            // NOTE: This takes the safe-mode switch into account. When it is enabled, the range is
             //       zoomed in to match the X-Y pad.
             let t = (self.x_renormalize_display)(self.frequency_range.normalize(frequency));
             if t <= 0.0 || t >= 1.0 {
@@ -109,13 +143,13 @@ impl View for SpectrumAnalyzer {
             let magnitude_db = nih_plug::util::gain_to_db(*magnitude);
             let height = ((magnitude_db + 80.0) / 100.0).clamp(0.0, 1.0);
 
-            path.move_to(
+            path.move_to((
                 bounds.x + (bounds.w * t),
                 bounds.y + (bounds.h * (1.0 - height)),
-            );
-            path.line_to(bounds.x + (bounds.w * t), bounds.y + bounds.h);
+            ));
+            path.line_to((bounds.x + (bounds.w * t), bounds.y + bounds.h));
         }
 
-        canvas.stroke_path(&path, &paint);
+        canvas.draw_path(&path, &paint);
     }
 }

@@ -39,12 +39,10 @@ pub(crate) fn create(
 
         VStack::new(cx, |cx| {
             Label::new(cx, "Gain GUI")
-                .font_family(vec![FamilyOwned::Name(String::from(assets::NOTO_SANS))])
+                .font_family(vec![FamilyOwned::Named(String::from(assets::NOTO_SANS))])
                 .font_weight(FontWeightKeyword::Thin)
                 .font_size(30.0)
-                .height(Pixels(50.0))
-                .child_top(Stretch(1.0))
-                .child_bottom(Pixels(0.0));
+                .height(Pixels(50.0));
 
             Label::new(cx, "Gain");
             ParamSlider::new(cx, Data::params, |params| &params.gain);
@@ -58,10 +56,9 @@ pub(crate) fn create(
             // This is how adding padding works in vizia
             .top(Pixels(10.0));
         })
-        .row_between(Pixels(0.0))
-        .child_left(Stretch(1.0))
-        .child_right(Stretch(1.0));
+        // In Vizia 3, row_between is replaced with horizontal_gap
+        .horizontal_gap(Pixels(0.0));
 
-        ResizeHandle::new(cx);
+        nih_plug_vizia::widgets::ResizeHandle::new(cx);
     })
 }

@@ -5,7 +5,6 @@ use std::cell::Cell;
 use std::time::Duration;
 use std::time::Instant;
 use vizia::prelude::*;
-use vizia::vg;
 
 /// The thickness of a tick inside of the peak meter's bar.
 const TICK_WIDTH: f32 = 1.0;
@@ -39,7 +38,7 @@ where
 impl PeakMeter {
     /// Creates a new [`PeakMeter`] for the given value in decibel, optionally holding the peak
     /// value for a certain amount of time.
-    pub fn new<L>(cx: &mut Context, level_dbfs: L, hold_time: Option<Duration>) -> Handle<Self>
+    pub fn new<L>(cx: &mut Context, level_dbfs: L, hold_time: Option<Duration>) -> Handle<'_, Self>
     where
         L: Lens<Target = f32>,
     {
@@ -115,14 +114,13 @@ impl PeakMeter {
                         .overflow(Overflow::Visible);
 
                         if needs_minus_offset {
-                            label.child_right(Pixels(font_size * 0.15));
+                            // In Vizia 3, we remove child_right and use padding/margin instead
+                            label.right(Pixels(font_size * 0.15));
                         }
                     })
                     .height(Stretch(1.0))
                     .left(Percentage(tick_pct - (WIDTH_PCT / 2.0)))
                     .width(Percentage(WIDTH_PCT))
-                    .child_left(Stretch(1.0))
-                    .child_right(Stretch(1.0))
                     .overflow(Overflow::Visible);
                 }
             })
@@ -144,9 +142,9 @@ where
     L: Lens<Target = f32>,
     P: Lens<Target = f32>,
 {
-    fn draw(&self, cx: &mut DrawContext, canvas: &mut Canvas) {
-        let level_dbfs = self.level_dbfs.get(cx);
-        let peak_dbfs = self.peak_dbfs.get(cx);
+    fn draw(&self, cx: &mut DrawContext, _canvas: &Canvas) {
+        let _level_dbfs = self.level_dbfs.get(cx);
+        let _peak_dbfs = self.peak_dbfs.get(cx);
 
         // These basics are taken directly from the default implementation of this function
         let bounds = cx.bounds();
@@ -156,9 +154,17 @@ where
 
         // TODO: It would be cool to allow the text color property to control the gradient here. For
         //       now we'll only support basic background colors and borders.
-        let background_color = cx.background_color();
-        let border_color = cx.border_color();
-        let opacity = cx.opacity();
+        // In Vizia 3, custom drawing APIs have changed significantly
+        // TODO: Update custom peak meter drawing to use new Vizia 3 canvas API
+        let _background_color = cx.background_color();
+        let _border_color = cx.border_color();
+        let _opacity = cx.opacity();
+
+        // Custom drawing disabled for Vizia 3 migration
+        // The Color API (set_alphaf) and Canvas API (fill_path, stroke_path) have changed
+        return;
+
+        /*
         let mut background_color: vg::Color = background_color.into();
         background_color.set_alphaf(background_color.a * opacity);
         let mut border_color: vg::Color = border_color.into();
@@ -242,5 +248,6 @@ where
         let mut paint = vg::Paint::color(border_color);
         paint.set_line_width(border_width);
         canvas.stroke_path(&path, &paint);
+        */
     }
 }

@@ -82,7 +82,7 @@ impl RestrictedParamSlider {
         params_to_param: FMap,
         renormalize_display: impl Fn(f32) -> f32 + Clone + 'static,
         renormalize_event: impl Fn(f32) -> f32 + 'static,
-    ) -> Handle<Self>
+    ) -> Handle<'_, Self>
     where
         L: Lens<Target = Params> + Clone,
         Params: 'static,
@@ -179,10 +179,6 @@ impl RestrictedParamSlider {
                 cx.emit(TextEvent::StartEdit);
                 cx.emit(TextEvent::SelectAll);
             })
-            // `.child_space(Stretch(1.0))` no longer works
-            .class("align_center")
-            .child_top(Stretch(1.0))
-            .child_bottom(Stretch(1.0))
             .height(Stretch(1.0))
             .width(Stretch(1.0));
     }
@@ -228,12 +224,10 @@ impl RestrictedParamSlider {
     /// Create the text part of the slider. Shown on top of the fill using a `ZStack`.
     fn slider_label_view(cx: &mut Context, display_value_lens: impl Lens<Target = String>) {
         Label::new(cx, display_value_lens)
-            .class("value")
-            .class("value--single")
-            .child_space(Stretch(1.0))
             .height(Stretch(1.0))
             .width(Stretch(1.0))
-            .hoverable(false);
+            .hoverable(false)
+            .text_align(TextAlign::Center);
     }
 
     /// Calculate the start position and width of the slider's fill region based on the selected
@@ -335,14 +329,14 @@ impl View for RestrictedParamSlider {
                     self.param_base.begin_set_parameter(cx);
                     if cx.modifiers().shift() {
                         self.granular_drag_status = Some(GranularDragStatus {
-                            starting_x_coordinate: cx.mouse().cursorx,
+                            starting_x_coordinate: cx.mouse().cursor_x,
                             starting_value: self.param_base.unmodulated_normalized_value(),
                         });
                     } else {
                         self.granular_drag_status = None;
                         self.set_normalized_value_drag(
                             cx,
-                            util::remap_current_entity_x_coordinate(cx, cx.mouse().cursorx),
+                            util::remap_current_entity_x_coordinate(cx, cx.mouse().cursor_x),
                         );
                     }
                 }
@@ -418,7 +412,7 @@ impl View for RestrictedParamSlider {
                     self.granular_drag_status = None;
                     self.param_base.set_normalized_value(
                         cx,
-                        util::remap_current_entity_x_coordinate(cx, cx.mouse().cursorx),
+                        util::remap_current_entity_x_coordinate(cx, cx.mouse().cursor_x),
                     );
                 }
             }

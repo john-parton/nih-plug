@@ -5,6 +5,7 @@ on:
   pull_request:
     branches:
       - master
+      - feature/vizia-3-upgrade
 
 defaults:
   run:
@@ -28,7 +29,7 @@ jobs:
         if: startsWith(matrix.os, 'ubuntu')
         run: |
           sudo apt-get update
-          sudo apt-get install -y libasound2-dev libgl-dev libjack-dev libx11-xcb-dev  libxcb1-dev libxcb-dri2-0-dev libxcb-icccm4-dev libxcursor-dev libxkbcommon-dev libxcb-shape0-dev libxcb-xfixes0-dev
+          sudo apt-get install -y libasound2-dev libjack-dev libgl1-mesa-dev libwayland-dev libx11-xcb-dev libxcb1-dev libxcb-dri2-0-dev libxcb-icccm4-dev libxcursor-dev libxkbcommon-dev libxcb-shape0-dev libxcb-xfixes0-dev libxcb-render0-dev
 
       - uses: actions/cache@v4
         # FIXME: Caching `target/` causes the Windows runner to blow up after some time
@@ -70,7 +71,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libasound2-dev libgl-dev libjack-dev libx11-xcb-dev  libxcb1-dev libxcb-dri2-0-dev libxcb-icccm4-dev libxcursor-dev libxkbcommon-dev libxcb-shape0-dev libxcb-xfixes0-dev
+          sudo apt-get install -y libasound2-dev libjack-dev libgl1-mesa-dev libwayland-dev libx11-xcb-dev libxcb1-dev libxcb-dri2-0-dev libxcb-icccm4-dev libxcursor-dev libxkbcommon-dev libxcb-shape0-dev libxcb-xfixes0-dev libxcb-render0-dev
 
       - uses: actions/cache@v4
         with:
