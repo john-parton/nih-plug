@@ -15,61 +15,58 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use nih_plug::prelude::Editor;
-use nih_plug_vizia::vizia::prelude::*;
-use nih_plug_vizia::widgets::*;
-use nih_plug_vizia::{assets, create_vizia_editor, ViziaState, ViziaTheming};
+use nih_plug_egui::{create_egui_editor, egui, widgets, EguiState};
 use std::sync::Arc;
 
 use crate::CrispParams;
 
-#[derive(Lens)]
-struct Data {
-    params: Arc<CrispParams>,
-}
-
-impl Model for Data {}
+/// The width and height of the GUI in logical pixels.
+const EDITOR_WIDTH: f32 = 400.0;
+const EDITOR_HEIGHT: f32 = 390.0;
 
 // Makes sense to also define this here, makes it a bit easier to keep track of
-pub(crate) fn default_state() -> Arc<ViziaState> {
-    ViziaState::new(|| (400, 390))
+pub(crate) fn default_state() -> Arc<EguiState> {
+    EguiState::from_size(EDITOR_WIDTH as u32, EDITOR_HEIGHT as u32)
 }
 
 pub(crate) fn create(
     params: Arc<CrispParams>,
-    editor_state: Arc<ViziaState>,
+    editor_state: Arc<EguiState>,
 ) -> Option<Box<dyn Editor>> {
-    create_vizia_editor(editor_state, ViziaTheming::Custom, move |cx, _| {
-        assets::register_noto_sans_light(cx);
-        assets::register_noto_sans_thin(cx);
+    create_egui_editor(
+        editor_state,
+        (),
+        |_, _| {},
+        move |egui_ctx, setter, _state| {
+            egui::CentralPanel::default().show(egui_ctx, |ui| {
+                ui.vertical(|ui| {
+                    // Title centered at the top
+                    ui.vertical_centered(|ui| {
+                        ui.add_space(10.0);
+                        ui.heading(
+                            egui::RichText::new("Crisp")
+                                .size(30.0)
+                                .font(egui::FontId::proportional(30.0)),
+                        );
+                        ui.add_space(10.0);
+                    });
 
-        Data {
-            params: params.clone(),
-        }
-        .build(cx);
+                    // Scrollable area for all the parameters
+                    egui::ScrollArea::vertical()
+                        .auto_shrink([false; 2])
+                        .show(ui, |ui| {
+                            ui.add_space(5.0);
 
-        VStack::new(cx, |cx| {
-            // Wrapper HStack to center the title horizontally
-            HStack::new(cx, |cx| {
-                Element::new(cx).width(Stretch(1.0));
-                Label::new(cx, "Crisp")
-                    .font_family(vec![FamilyOwned::Named(String::from(assets::NOTO_SANS))])
-                    .font_weight(FontWeightKeyword::Thin)
-                    .font_size(30.0);
-                Element::new(cx).width(Stretch(1.0));
-            })
-            .height(Pixels(50.0))
-            .width(Percentage(100.0));
-
-            ScrollView::new(cx, |cx| {
-                // This looks better if it's flush at the top, and then we'll just add some padding
-                // at the top of the scroll view
-                GenericUi::new(cx, Data::params);
-            })
-            .width(Percentage(100.0))
-            .top(Pixels(5.0));
-        })
-        .width(Percentage(100.0));
-
-        nih_plug_vizia::widgets::ResizeHandle::new(cx);
-    })
+                            // Use the generic UI to display all parameters
+                            widgets::generic_ui::create(
+                                ui,
+                                params.clone(),
+                                setter,
+                                widgets::generic_ui::GenericSlider,
+                            );
+                        });
+                });
+            });
+        },
+    )
 }

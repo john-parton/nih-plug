@@ -1258,7 +1258,6 @@ version = "0.1.0"
 dependencies = [
  "nih_plug",
  "nih_plug_egui",
- "nih_plug_vizia",
 ]
 
 [[package]]
