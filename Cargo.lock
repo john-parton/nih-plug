@@ -4813,7 +4813,7 @@ dependencies = [
  "atomic_float",
  "crossbeam",
  "nih_plug",
- "nih_plug_vizia",
+ "nih_plug_egui",
  "open 3.2.0",
  "realfft",
  "serde",

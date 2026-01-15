@@ -17,9 +17,9 @@
 use analyzer::AnalyzerData;
 use atomic_float::AtomicF32;
 use crossbeam::atomic::AtomicCell;
-use editor::EditorMode;
+use editor_egui::EditorMode;
 use nih_plug::prelude::*;
-use nih_plug_vizia::ViziaState;
+use nih_plug_egui::EguiState;
 use realfft::num_complex::Complex32;
 use realfft::{ComplexToReal, RealFftPlanner, RealToComplex};
 use std::sync::atomic::Ordering;
@@ -30,7 +30,8 @@ mod analyzer;
 mod compressor_bank;
 mod curve;
 mod dry_wet_mixer;
-mod editor;
+// mod editor; // Old vizia editor - keeping for reference
+mod editor_egui;
 
 const MIN_WINDOW_ORDER: usize = 6;
 #[allow(dead_code)]
@@ -96,8 +97,8 @@ pub struct SpectralCompressorParams {
     /// The editor state, saved together with the parameter state so the custom scaling can be
     /// restored.
     #[persist = "editor-state"]
-    pub editor_state: Arc<ViziaState>,
-    /// The mode the editor is currently in. Essentially just a fancy boolean to indicate whether
+    pub editor_state: Arc<EguiState>,
+    /// The mode the editor is currently in. Essentially just a boolean to indicate whether
     /// it's expanded or not.
     #[persist = "editor-mode"]
     pub editor_mode: Arc<AtomicCell<EditorMode>>,
@@ -268,7 +269,7 @@ impl SpectralCompressorParams {
         let editor_mode: Arc<AtomicCell<EditorMode>> = Arc::default();
 
         SpectralCompressorParams {
-            editor_state: editor::default_state(editor_mode.clone()),
+            editor_state: editor_egui::default_state(editor_mode.clone()),
             editor_mode,
 
             // TODO: Do still enable per-block smoothing for these settings, because why not. This
@@ -318,16 +319,12 @@ impl Plugin for SpectralCompressor {
     }
 
     fn editor(&mut self, _async_executor: AsyncExecutor<Self>) -> Option<Box<dyn Editor>> {
-        editor::create(
+        editor_egui::create(
+            self.params.clone(),
             self.params.editor_state.clone(),
-            editor::Data {
-                params: self.params.clone(),
-
-                editor_mode: self.params.editor_mode.clone(),
-
-                analyzer_data: self.analyzer_output_data.clone(),
-                sample_rate: self.sample_rate.clone(),
-            },
+            self.params.editor_mode.clone(),
+            self.analyzer_output_data.clone(),
+            self.sample_rate.clone(),
         )
     }
 

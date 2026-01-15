@@ -11,7 +11,7 @@ crate-type = ["lib", "cdylib"]
 
 [dependencies]
 nih_plug = { path = "../../", features = ["assert_process_allocs", "standalone"] }
-nih_plug_vizia = { path = "../../nih_plug_vizia" }
+nih_plug_egui = { path = "../../nih_plug_egui" }
 
 realfft = "3.0"
 
