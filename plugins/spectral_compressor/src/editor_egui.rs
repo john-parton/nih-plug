@@ -74,15 +74,19 @@ pub(crate) fn create(
                     // Main controls column(s)
                     ui.vertical(|ui| {
                         ui.set_width(COLLAPSED_GUI_WIDTH);
-                        
+
                         // Mode button at the top
                         ui.horizontal(|ui| {
-                            let analyzer_visible = editor_mode.load() == EditorMode::AnalyzerVisible;
-                            if ui.button(if analyzer_visible {
-                                "Hide analyzer"
-                            } else {
-                                "Show analyzer"
-                            }).clicked() {
+                            let analyzer_visible =
+                                editor_mode.load() == EditorMode::AnalyzerVisible;
+                            if ui
+                                .button(if analyzer_visible {
+                                    "Hide analyzer"
+                                } else {
+                                    "Show analyzer"
+                                })
+                                .clicked()
+                            {
                                 let new_mode = if analyzer_visible {
                                     EditorMode::Collapsed
                                 } else {
@@ -100,28 +104,69 @@ pub(crate) fn create(
                             // Left column: Globals and Threshold
                             ui.vertical(|ui| {
                                 ui.set_width(COLUMN_WIDTH);
-                                
+
                                 // Globals section
                                 ui.heading("Globals");
-                                ui.add(widgets::ParamSlider::for_param(&params.global.output_gain, setter));
-                                ui.add(widgets::ParamSlider::for_param(&params.global.dry_wet_ratio, setter));
-                                ui.add(widgets::ParamSlider::for_param(&params.global.window_size_order, setter));
-                                ui.add(widgets::ParamSlider::for_param(&params.global.overlap_times_order, setter));
-                                ui.add(widgets::ParamSlider::for_param(&params.global.compressor_attack_ms, setter));
-                                ui.add(widgets::ParamSlider::for_param(&params.global.compressor_release_ms, setter));
+                                ui.add(widgets::ParamSlider::for_param(
+                                    &params.global.output_gain,
+                                    setter,
+                                ));
+                                ui.add(widgets::ParamSlider::for_param(
+                                    &params.global.dry_wet_ratio,
+                                    setter,
+                                ));
+                                ui.add(widgets::ParamSlider::for_param(
+                                    &params.global.window_size_order,
+                                    setter,
+                                ));
+                                ui.add(widgets::ParamSlider::for_param(
+                                    &params.global.overlap_times_order,
+                                    setter,
+                                ));
+                                ui.add(widgets::ParamSlider::for_param(
+                                    &params.global.compressor_attack_ms,
+                                    setter,
+                                ));
+                                ui.add(widgets::ParamSlider::for_param(
+                                    &params.global.compressor_release_ms,
+                                    setter,
+                                ));
 
                                 ui.add_space(20.0);
 
                                 // Threshold section
                                 ui.heading("Threshold");
-                                ui.add(widgets::ParamSlider::for_param(&params.threshold.threshold_db, setter));
-                                ui.add(widgets::ParamSlider::for_param(&params.threshold.center_frequency, setter));
-                                ui.add(widgets::ParamSlider::for_param(&params.threshold.curve_slope, setter));
-                                ui.add(widgets::ParamSlider::for_param(&params.threshold.curve_curve, setter));
-                                ui.add(widgets::ParamSlider::for_param(&params.threshold.mode, setter));
-                                ui.add(widgets::ParamSlider::for_param(&params.threshold.sc_channel_link, setter));
+                                ui.add(widgets::ParamSlider::for_param(
+                                    &params.threshold.threshold_db,
+                                    setter,
+                                ));
+                                ui.add(widgets::ParamSlider::for_param(
+                                    &params.threshold.center_frequency,
+                                    setter,
+                                ));
+                                ui.add(widgets::ParamSlider::for_param(
+                                    &params.threshold.curve_slope,
+                                    setter,
+                                ));
+                                ui.add(widgets::ParamSlider::for_param(
+                                    &params.threshold.curve_curve,
+                                    setter,
+                                ));
+                                ui.add(widgets::ParamSlider::for_param(
+                                    &params.threshold.mode,
+                                    setter,
+                                ));
+                                ui.add(widgets::ParamSlider::for_param(
+                                    &params.threshold.sc_channel_link,
+                                    setter,
+                                ));
 
-                                ui.label("Parameter ranges and overall gain staging are still subject to\nchange. If you use this in a project, make sure to bounce\nthings to audio just in case they'll sound different later.");
+                                ui.label(
+                                    "Parameter ranges and overall gain staging are still subject \
+                                     to\nchange. If you use this in a project, make sure to \
+                                     bounce\nthings to audio just in case they'll sound different \
+                                     later.",
+                                );
                             });
 
                             ui.add_space(20.0);
@@ -129,22 +174,46 @@ pub(crate) fn create(
                             // Right column: Upwards and Downwards
                             ui.vertical(|ui| {
                                 ui.set_width(COLUMN_WIDTH);
-                                
+
                                 // Upwards section
                                 ui.heading("Upwards");
-                                ui.add(widgets::ParamSlider::for_param(&params.compressors.upwards.threshold_offset_db, setter));
-                                ui.add(widgets::ParamSlider::for_param(&params.compressors.upwards.ratio, setter));
-                                ui.add(widgets::ParamSlider::for_param(&params.compressors.upwards.high_freq_ratio_rolloff, setter));
-                                ui.add(widgets::ParamSlider::for_param(&params.compressors.upwards.knee_width_db, setter));
+                                ui.add(widgets::ParamSlider::for_param(
+                                    &params.compressors.upwards.threshold_offset_db,
+                                    setter,
+                                ));
+                                ui.add(widgets::ParamSlider::for_param(
+                                    &params.compressors.upwards.ratio,
+                                    setter,
+                                ));
+                                ui.add(widgets::ParamSlider::for_param(
+                                    &params.compressors.upwards.high_freq_ratio_rolloff,
+                                    setter,
+                                ));
+                                ui.add(widgets::ParamSlider::for_param(
+                                    &params.compressors.upwards.knee_width_db,
+                                    setter,
+                                ));
 
                                 ui.add_space(20.0);
 
-                                // Downwards section  
+                                // Downwards section
                                 ui.heading("Downwards");
-                                ui.add(widgets::ParamSlider::for_param(&params.compressors.downwards.threshold_offset_db, setter));
-                                ui.add(widgets::ParamSlider::for_param(&params.compressors.downwards.ratio, setter));
-                                ui.add(widgets::ParamSlider::for_param(&params.compressors.downwards.high_freq_ratio_rolloff, setter));
-                                ui.add(widgets::ParamSlider::for_param(&params.compressors.downwards.knee_width_db, setter));
+                                ui.add(widgets::ParamSlider::for_param(
+                                    &params.compressors.downwards.threshold_offset_db,
+                                    setter,
+                                ));
+                                ui.add(widgets::ParamSlider::for_param(
+                                    &params.compressors.downwards.ratio,
+                                    setter,
+                                ));
+                                ui.add(widgets::ParamSlider::for_param(
+                                    &params.compressors.downwards.high_freq_ratio_rolloff,
+                                    setter,
+                                ));
+                                ui.add(widgets::ParamSlider::for_param(
+                                    &params.compressors.downwards.knee_width_db,
+                                    setter,
+                                ));
                             });
                         });
                     });
@@ -152,7 +221,7 @@ pub(crate) fn create(
                     // Analyzer panel (only if visible)
                     if editor_mode.load() == EditorMode::AnalyzerVisible {
                         ui.separator();
-                        
+
                         // Analyzer widget
                         analyzer::Analyzer::new(
                             analyzer_data.clone(),

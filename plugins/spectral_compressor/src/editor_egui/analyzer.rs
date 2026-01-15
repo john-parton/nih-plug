@@ -65,11 +65,7 @@ impl Analyzer {
         }
 
         // Draw background
-        painter.rect_filled(
-            rect,
-            0.0,
-            ui.style().visuals.extreme_bg_color,
-        );
+        painter.rect_filled(rect, 0.0, ui.style().visuals.extreme_bg_color);
 
         // Get the analyzer data
         let mut analyzer_data = self.analyzer_data.lock().unwrap();
@@ -85,7 +81,10 @@ impl Analyzer {
         painter.rect_stroke(
             rect,
             0.0,
-            egui::Stroke::new(1.0, ui.style().visuals.widgets.noninteractive.bg_stroke.color),
+            egui::Stroke::new(
+                1.0,
+                ui.style().visuals.widgets.noninteractive.bg_stroke.color,
+            ),
             egui::StrokeKind::Outside,
         );
     }
@@ -102,7 +101,10 @@ impl Analyzer {
         let text_color = ui.style().visuals.text_color();
 
         // Draw vertical bars for the spectrum
-        for (bin_idx, envelope) in analyzer_data.envelope_followers[..analyzer_data.num_bins].iter().enumerate() {
+        for (bin_idx, envelope) in analyzer_data.envelope_followers[..analyzer_data.num_bins]
+            .iter()
+            .enumerate()
+        {
             let frequency_hz = (bin_idx as f32 / analyzer_data.num_bins as f32) * nyquist_hz;
             let t = Self::frequency_to_x_coord(frequency_hz, rect.width());
             if !(0.0..=1.0).contains(&t) {
@@ -150,14 +152,14 @@ impl Analyzer {
     ) {
         let curve = Curve::new(&analyzer_data.curve_params);
         let threshold_db_offset = if is_downwards {
-            analyzer_data.curve_offsets_db.1  // downwards
+            analyzer_data.curve_offsets_db.1 // downwards
         } else {
-            analyzer_data.curve_offsets_db.0  // upwards
+            analyzer_data.curve_offsets_db.0 // upwards
         };
 
         let mut points = Vec::new();
         let num_samples = rect.width() as usize;
-        
+
         for i in 0..num_samples {
             let t = i as f32 / (num_samples - 1) as f32;
             let frequency_hz = Self::x_coord_to_frequency(t, rect.width());
@@ -184,7 +186,10 @@ impl Analyzer {
         let line_width = 1.5;
 
         // Draw gain reduction as vertical bars from the bottom
-        for (bin_idx, gain_diff_db) in analyzer_data.gain_difference_db[..analyzer_data.num_bins].iter().enumerate() {
+        for (bin_idx, gain_diff_db) in analyzer_data.gain_difference_db[..analyzer_data.num_bins]
+            .iter()
+            .enumerate()
+        {
             // gain_difference_db is positive for gain, negative for attenuation
             // We want to show gain reduction (attenuation), so we visualize when it's negative
             if *gain_diff_db >= 0.0 {

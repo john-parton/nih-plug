@@ -15,6 +15,54 @@ use raw_window_handle::{HasRawWindowHandle, RawWindowHandle};
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
+/// Create an OpenGL configuration suitable for Wine compatibility.
+/// This can be enabled by setting the environment variable NIH_PLUG_WINE_COMPAT=1
+#[cfg(feature = "opengl")]
+fn get_gl_config() -> GlConfig {
+    // Check for Wine compatibility mode
+    let wine_compat = std::env::var("NIH_PLUG_WINE_COMPAT")
+        .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
+        .unwrap_or(false);
+
+    if wine_compat {
+        eprintln!("[nih_plug_egui] Wine compatibility mode enabled - using conservative OpenGL settings");
+        eprintln!("[nih_plug_egui] GL version: 3.0, sRGB: disabled, vsync: disabled");
+        // Conservative settings for Wine compatibility
+        GlConfig {
+            version: (3, 0),  // Lower OpenGL version requirement
+            red_bits: 8,
+            blue_bits: 8,
+            green_bits: 8,
+            alpha_bits: 8,
+            depth_bits: 16,   // Reduced depth buffer
+            stencil_bits: 0,  // No stencil buffer
+            samples: None,    // No MSAA
+            srgb: false,      // sRGB can be problematic in Wine
+            double_buffer: true,
+            vsync: false,     // vsync can cause issues under Wine
+            ..Default::default()
+        }
+    } else {
+        eprintln!("[nih_plug_egui] Using default OpenGL settings");
+        eprintln!("[nih_plug_egui] GL version: 3.2, sRGB: enabled, vsync: enabled");
+        // Default configuration
+        GlConfig {
+            version: (3, 2),
+            red_bits: 8,
+            blue_bits: 8,
+            green_bits: 8,
+            alpha_bits: 8,
+            depth_bits: 24,
+            stencil_bits: 8,
+            samples: None,
+            srgb: true,
+            double_buffer: true,
+            vsync: true,
+            ..Default::default()
+        }
+    }
+}
+
 /// An [`Editor`] implementation that calls an egui draw loop.
 pub(crate) struct EguiEditor<T> {
     pub(crate) egui_state: Arc<EguiState>,
@@ -86,20 +134,7 @@ where
                     .unwrap_or(WindowScalePolicy::SystemScaleFactor),
 
                 #[cfg(feature = "opengl")]
-                gl_config: Some(GlConfig {
-                    version: (3, 2),
-                    red_bits: 8,
-                    blue_bits: 8,
-                    green_bits: 8,
-                    alpha_bits: 8,
-                    depth_bits: 24,
-                    stencil_bits: 8,
-                    samples: None,
-                    srgb: true,
-                    double_buffer: true,
-                    vsync: true,
-                    ..Default::default()
-                }),
+                gl_config: Some(get_gl_config()),
             },
             Default::default(),
             state,
