@@ -15,11 +15,13 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use nih_plug::prelude::*;
+use nih_plug_egui::EguiState;
 use nih_plug_vizia::ViziaState;
 use pcg::Pcg32iState;
 use std::sync::Arc;
 
 mod editor;
+mod editor_egui;
 mod filter;
 mod pcg;
 
@@ -63,6 +65,10 @@ struct CrispParams {
     /// restored.
     #[persist = "editor-state"]
     editor_state: Arc<ViziaState>,
+
+    /// The egui editor state
+    #[persist = "editor-state-egui"]
+    editor_state_egui: Arc<EguiState>,
 
     /// On a range of `[0, 1]`, how much of the modulated sound to mix in.
     #[id = "amount"]
@@ -150,6 +156,7 @@ impl Default for CrispParams {
 
         Self {
             editor_state: editor::default_state(),
+            editor_state_egui: editor_egui::default_state(),
 
             amount: FloatParam::new("Amount", 0.35, FloatRange::Linear { min: 0.0, max: 1.0 })
                 .with_smoother(SmoothingStyle::Linear(10.0))
@@ -318,7 +325,11 @@ impl Plugin for Crisp {
     }
 
     fn editor(&mut self, _async_executor: AsyncExecutor<Self>) -> Option<Box<dyn Editor>> {
-        editor::create(self.params.clone(), self.params.editor_state.clone())
+        // Use the egui editor
+        editor_egui::create(self.params.clone(), self.params.editor_state_egui.clone())
+        
+        // Old vizia editor (keeping for reference during port)
+        // editor::create(self.params.clone(), self.params.editor_state.clone())
     }
 
     fn initialize(
