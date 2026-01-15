@@ -6,6 +6,7 @@ on:
     branches:
       - master
       - feature/vizia-3-upgrade
+      - feature/port-plugins-to-egui
 
 defaults:
   run:
